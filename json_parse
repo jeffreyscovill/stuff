@@ -1,0 +1,816 @@
+create or replace view curated_stg.vw_stg_web_event_daily 
+as
+ select concat(a.raw:user_pseudo_id::string
+               ,'-'
+               ,arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                               , transform(raw:event_params, entry -> case when not is_null_value(entry:value.double_value) 
+                                                                           then entry:value.double_value 
+                                                                           when not is_null_value(entry:value.float_value) 
+                                                                           then entry:value.float_value 
+                                                                           when not is_null_value(entry:value.int_value) 
+                                                                           then entry:value.int_value 
+                                                                           when not is_null_value(entry:value.string_value) 
+                                                                           then entry:value.string_value 
+                                                                           else null 
+                                                                       end)):ga_session_id::string) as session_code
+        ,a.raw:user_pseudo_id::string as user_pseudo_code
+        ,arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                        , transform(raw:event_params, entry -> case when not is_null_value(entry:value.double_value) 
+                                                                    then entry:value.double_value 
+                                                                    when not is_null_value(entry:value.float_value) 
+                                                                    then entry:value.float_value 
+                                                                    when not is_null_value(entry:value.int_value) 
+                                                                    then entry:value.int_value 
+                                                                    when not is_null_value(entry:value.string_value) 
+                                                                    then entry:value.string_value 
+                                                                    else null 
+                                                                end)):ga_session_id::string as google_analytics_session_code
+        ,to_date(a.raw:event_date::string, 'YYYYMMDD') as event_date
+        ,a.raw:event_name::string as event_name_text
+        ,to_timestamp_ntz(a.raw:event_timestamp::int, 6) as event_timestamp
+        ,a.raw:device.web_info.hostname::string as hostname_text
+        ,case when lower(substr(a.raw:device.web_info.hostname::string, 1, 9)) = lower('checkout.') 
+              then lower(substr(a.raw:device.web_info.hostname::string, 10))
+              when lower(substr(a.raw:device.web_info.hostname::string, 1, 5)) = lower('shop.') 
+              then lower(substr(a.raw:device.web_info.hostname::string, 6))
+              when lower(substr(a.raw:device.web_info.hostname::string, 1, 4)) = lower('www.') 
+              then lower(substr(a.raw:device.web_info.hostname::string, 5))
+              else a.raw:device.web_info.hostname::string
+          end::string as hostname_extracted_text
+        ,a.raw:device.category::string as device_category_text
+        ,case when lower(a.raw:event_name::string) = 'view_search_results'
+              then 'search'
+              else 'no search'
+          end as search_event_text
+        ,case when lower(a.raw:device.web_info.hostname::string) like lower('%vuoriclothing%')
+               and lower(a.raw:device.web_info.hostname::string) not like lower('%deploy%')
+               and lower(a.raw:device.web_info.hostname::string) not like lower('%sandbox%')
+               and lower(a.raw:device.web_info.hostname::string) not like lower('%production%')
+               and lower(a.raw:device.web_info.hostname::string) not like lower('%staging%')
+               and lower(a.raw:device.web_info.hostname::string) not like lower('%development%')
+               and lower(a.raw:device.web_info.hostname::string) not like lower('%test%')
+               and lower(a.raw:device.web_info.hostname::string) not like lower('%local%')
+               and lower(a.raw:device.web_info.hostname::string) not like lower('%translate%')
+               and lower(a.raw:device.web_info.hostname::string) not like lower('%capture%')
+               and lower(a.raw:device.web_info.hostname::string) not like lower('%mall%')
+               and lower(a.raw:device.web_info.hostname::string) not like lower('%edgemesh%') 
+              then '1'
+              else '0'
+          end ::string as production_domain_flag
+        ,'_N/A' as event_region_text
+        ,a.raw:device.language::string as device_language_text
+        ,a.raw:geo.country::string as event_country_code
+        ,a.raw:geo.region::string as event_province_or_state_text
+        ,a.raw:geo.metro::string as event_metro_area_text
+        ,a.raw:geo.city::string as event_city_text
+        ,a.raw:traffic_source.source::string as event_source_text
+        ,a.raw:traffic_source.medium::string as event_medium_text
+        ,'_N/A' as event_source_medium_text
+        ,arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                        , transform(raw:event_params, entry -> case when not is_null_value(entry:value.double_value) 
+                                                                    then entry:value.double_value 
+                                                                    when not is_null_value(entry:value.float_value) 
+                                                                    then entry:value.float_value 
+                                                                    when not is_null_value(entry:value.int_value) 
+                                                                    then entry:value.int_value 
+                                                                    when not is_null_value(entry:value.string_value) 
+                                                                    then entry:value.string_value 
+                                                                    else null 
+                                                                end)):page_title::string as event_landing_page_text
+        ,arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                        , transform(raw:event_params, entry -> case when not is_null_value(entry:value.double_value) 
+                                                                    then entry:value.double_value 
+                                                                    when not is_null_value(entry:value.float_value) 
+                                                                    then entry:value.float_value 
+                                                                    when not is_null_value(entry:value.int_value) 
+                                                                    then entry:value.int_value 
+                                                                    when not is_null_value(entry:value.string_value) 
+                                                                    then entry:value.string_value 
+                                                                    else null 
+                                                                end)):page_location::string as event_landing_page_link_text
+        ,case when lower(a.raw:device.web_info.hostname::string) like lower('%vuoriclothing%')
+               and lower(a.raw:device.web_info.hostname::string) not like lower('%deploy%')
+               and lower(a.raw:device.web_info.hostname::string) not like lower('%sandbox%')
+               and lower(a.raw:device.web_info.hostname::string) not like lower('%production%') 
+               and lower(a.raw:device.web_info.hostname::string) not like lower('%staging%')
+               and lower(a.raw:device.web_info.hostname::string) not like lower('%development%')
+               and lower(a.raw:device.web_info.hostname::string) not like lower('%test%')
+               and lower(a.raw:device.web_info.hostname::string) not like lower('%local%')
+               and lower(a.raw:device.web_info.hostname::string) not like lower('%translate%')
+               and lower(a.raw:device.web_info.hostname::string) not like lower('%capture%')
+               and lower(a.raw:device.web_info.hostname::string) not like lower('%mall%')
+               and lower(a.raw:device.web_info.hostname::string) not like lower('%edgemesh%') 
+              then case when lower(arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                                                  , transform(raw:event_params, entry -> case when not is_null_value(entry:value.string_value) 
+                                                                                              then entry:value.string_value 
+                                                                                              else null 
+                                                                                          end)):page_location::string) like '%vuoriclothing.com/' 
+                        then 'home'
+                        when lower(arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                                                  , transform(raw:event_params, entry -> case when not is_null_value(entry:value.string_value) 
+                                                                                              then entry:value.string_value 
+                                                                                              else null 
+                                                                                          end)):page_location::string) like '%search%' 
+                        then 'search'
+                        when lower(arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                                                  , transform(raw:event_params, entry -> case when not is_null_value(entry:value.string_value) 
+                                                                                              then entry:value.string_value 
+                                                                                              else null 
+                                                                                          end)):page_location::string) like '%collections%'
+                        then 'collection'
+                        when lower(arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                                                  , transform(raw:event_params, entry -> case when not is_null_value(entry:value.string_value) 
+                                                                                              then entry:value.string_value 
+                                                                                              else null 
+                                                                                          end)):page_location::string) like '%gift%'
+                                                                                          
+                         and lower(arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                                                  , transform(raw:event_params, entry -> case when not is_null_value(entry:value.string_value) 
+                                                                                              then entry:value.string_value 
+                                                                                              else null 
+                                                                                          end)):page_location::string) not like '%giftcard%' 
+                                                                                                                                                           
+                        then 'gift guide'
+                        when lower(arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                                                  , transform(raw:event_params, entry -> case when not is_null_value(entry:value.string_value) 
+                                                                                              then entry:value.string_value 
+                                                                                              else null 
+                                                                                          end)):page_location::string) like '%account%'  
+                        then 'account'
+                        when lower(arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                                                  , transform(raw:event_params, entry -> case when not is_null_value(entry:value.string_value) 
+                                                                                              then entry:value.string_value 
+                                                                                              else null 
+                                                                                          end)):page_location::string) like '%pages%' 
+                        then 'page'
+                        when lower(arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                                                  , transform(raw:event_params, entry -> case when not is_null_value(entry:value.string_value) 
+                                                                                              then entry:value.string_value 
+                                                                                              else null 
+                                                                                          end)):page_location::string) like '%blogs%' 
+                        then 'blog'
+                        when lower(arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                                                  , transform(raw:event_params, entry -> case when not is_null_value(entry:value.string_value) 
+                                                                                              then entry:value.string_value 
+                                                                                              else null 
+                                                                                          end)):page_location::string) like '%products%'  
+                        then 'product'
+                        when lower(arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                                                  , transform(raw:event_params, entry -> case when not is_null_value(entry:value.string_value) 
+                                                                                              then entry:value.string_value 
+                                                                                              else null 
+                                                                                          end)):page_location::string) like '%cart%' 
+                        then 'cart'
+                        when lower(arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                                                  , transform(raw:event_params, entry -> case when not is_null_value(entry:value.string_value) 
+                                                                                              then entry:value.string_value 
+                                                                                              else null 
+                                                                                          end)):page_location::string) like '%checkout%' 
+                        then 'checkout'
+                        when lower(arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                                                  , transform(raw:event_params, entry -> case when not is_null_value(entry:value.string_value) 
+                                                                                              then entry:value.string_value 
+                                                                                              else null 
+                                                                                          end)):page_location::string) like '%thank_you%' 
+                        then 'purchase'
+                        when lower(arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                                                  , transform(raw:event_params, entry -> case when not is_null_value(entry:value.string_value) 
+                                                                                              then entry:value.string_value 
+                                                                                              else null 
+                                                                                          end)):page_location::string) like '%apps%'  
+                        then 'apps'
+                        when lower(arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                                                  , transform(raw:event_params, entry -> case when not is_null_value(entry:value.string_value) 
+                                                                                              then entry:value.string_value 
+                                                                                              else null 
+                                                                                          end)):page_location::string) like '%discount%' 
+                        then 'discount'
+                        when lower(arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                                                  , transform(raw:event_params, entry -> case when not is_null_value(entry:value.string_value) 
+                                                                                              then entry:value.string_value 
+                                                                                              else null 
+                                                                                          end)):page_location::string) like '%forms%' 
+                        then 'forms'
+                        when lower(arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                                                  , transform(raw:event_params, entry -> case when not is_null_value(entry:value.string_value) 
+                                                                                              then entry:value.string_value 
+                                                                                              else null 
+                                                                                          end)):page_location::string) like '%vuoriclothing.com/?%' 
+                          or a.raw:device.web_info.hostname::string not in ('vuoriclothing.com','checkout.vuoriclothing.com','shop.vuoriclothing.com','www.vuoriclothing.com')
+                        then 'home'
+                        else 'other'   
+                    end
+              else 'non production'
+          end as page_type_text
+        ,a.raw:ecommerce.total_item_quantity::int as sales_quantity
+        ,coalesce(a.raw:event_value_in_usd::float  
+                 ,arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                                 , transform(raw:event_params, entry -> case when not is_null_value(entry:value.double_value) 
+                                                                             then entry:value.double_value 
+                                                                             when not is_null_value(entry:value.float_value) 
+                                                                             then entry:value.float_value 
+                                                                             when not is_null_value(entry:value.int_value) 
+                                                                             then entry:value.int_value 
+                                                                             when not is_null_value(entry:value.string_value) 
+                                                                             then entry:value.string_value 
+                                                                             else null 
+                                                                         end)):order_total::float) as sales_amount        
+        ,coalesce(a.raw:ecommerce.transaction_id::string 
+                 ,arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                                 , transform(raw:event_params, entry -> case when not is_null_value(entry:value.double_value) 
+                                                                             then entry:value.double_value 
+                                                                             when not is_null_value(entry:value.float_value) 
+                                                                             then entry:value.float_value 
+                                                                             when not is_null_value(entry:value.int_value) 
+                                                                             then entry:value.int_value 
+                                                                             when not is_null_value(entry:value.string_value) 
+                                                                             then entry:value.string_value 
+                                                                             else null 
+                                                                        end)):order_id::string) as order_number_text 
+        ,arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                        , transform(raw:event_params, entry -> case when not is_null_value(entry:value.double_value) 
+                                                                    then entry:value.double_value 
+                                                                    when not is_null_value(entry:value.float_value) 
+                                                                    then entry:value.float_value 
+                                                                    when not is_null_value(entry:value.int_value) 
+                                                                    then entry:value.int_value 
+                                                                    when not is_null_value(entry:value.string_value) 
+                                                                    then entry:value.string_value 
+                                                                    else null 
+                                                                end)):traffic_type::string as traffic_type_text
+        ,coalesce(b.bot_flag,'0') as bot_flag
+        ,'_N/A' as market_code
+        ,'_N/A' as market_sub_code
+        ,'_N/A' as market_country_code
+        ,'_N/A' as open_to_buy_text
+        ,'EC' as distribution_channel_code
+        ,'_N/A' as campaign_funnel_text
+        ,'_N/A' as campaign_target_text
+        ,'_N/A' as campaign_tactic_text
+        ,'_N/A' as campaign_platform_text
+        ,'_N/A' as campaign_channel_type_text
+        ,'_N/A' as campaign_search_type_text
+        ,'_N/A' as campaign_channel_category_text
+        ,'_N/A' as campaign_channel_subcategory_text
+        ,'_N/A' as campaign_publisher_text
+        ,'_N/A' as campaign_search_target_group_text
+        ,'_N/A' as campaign_optimization_text
+        ,'_N/A' as campaign_type_text
+        ,1 as event_quantity
+        ,arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                        , transform(raw:event_params, entry -> case when not is_null_value(entry:value.double_value) 
+                                                                    then entry:value.double_value 
+                                                                    when not is_null_value(entry:value.float_value) 
+                                                                    then entry:value.float_value 
+                                                                    when not is_null_value(entry:value.int_value) 
+                                                                    then entry:value.int_value 
+                                                                    when not is_null_value(entry:value.string_value) 
+                                                                    then entry:value.string_value 
+                                                                    else null 
+                                                                end)):event_type::string as event_type_text
+        ,arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                        , transform(raw:event_params, entry -> case when not is_null_value(entry:value.double_value) 
+                                                                    then entry:value.double_value 
+                                                                    when not is_null_value(entry:value.float_value) 
+                                                                    then entry:value.float_value 
+                                                                    when not is_null_value(entry:value.int_value) 
+                                                                    then entry:value.int_value 
+                                                                    when not is_null_value(entry:value.string_value) 
+                                                                    then entry:value.string_value 
+                                                                    else null 
+                                                                end)):engagement_time_msec::string as engagement_millisecond_quantity
+        ,arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                        , transform(raw:event_params, entry -> case when not is_null_value(entry:value.double_value) 
+                                                                    then entry:value.double_value 
+                                                                    when not is_null_value(entry:value.float_value) 
+                                                                    then entry:value.float_value 
+                                                                    when not is_null_value(entry:value.int_value) 
+                                                                    then entry:value.int_value 
+                                                                    when not is_null_value(entry:value.string_value) 
+                                                                    then entry:value.string_value 
+                                                                    else null 
+                                                                end)):ga_session_number::string as google_analytics_session_number_quantity
+        ,a.raw:traffic_source.name::string as event_traffic_source_name_text
+        ,arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                        , transform(raw:event_params, entry -> case when not is_null_value(entry:value.double_value) 
+                                                                    then entry:value.double_value 
+                                                                    when not is_null_value(entry:value.float_value) 
+                                                                    then entry:value.float_value 
+                                                                    when not is_null_value(entry:value.int_value) 
+                                                                    then entry:value.int_value 
+                                                                    when not is_null_value(entry:value.string_value) 
+                                                                    then entry:value.string_value 
+                                                                    else null 
+                                                                end)):page_title::string as page_title_text
+        ,arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                        , transform(raw:event_params, entry -> case when not is_null_value(entry:value.double_value) 
+                                                                    then entry:value.double_value 
+                                                                    when not is_null_value(entry:value.float_value) 
+                                                                    then entry:value.float_value 
+                                                                    when not is_null_value(entry:value.int_value) 
+                                                                    then entry:value.int_value 
+                                                                    when not is_null_value(entry:value.string_value) 
+                                                                    then entry:value.string_value 
+                                                                    else null 
+                                                                end)):item_list_id::string as item_list_text
+        ,arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                        , transform(raw:event_params, entry -> case when not is_null_value(entry:value.string_value) 
+                                                                    then entry:value.string_value 
+                                                                    else null 
+                                                                end)):page_location::string as page_location_text
+        ,case case when lower(substr(a.raw:device.web_info.hostname, 1, 9)) = lower('checkout.') 
+                   then lower(substr(a.raw:device.web_info.hostname, 10))
+                   when lower(substr(a.raw:device.web_info.hostname, 1, 5)) = lower('shop.') 
+                   then lower(substr(a.raw:device.web_info.hostname, 6))
+                   when lower(substr(a.raw:device.web_info.hostname, 1, 4)) = lower('www.') 
+                   then lower(substr(a.raw:device.web_info.hostname, 5))
+                   else a.raw:device.web_info.hostname
+               end
+              when 'vuoriclothing.com' then 'USA'
+              when 'vuoriclothing.ca' then 'CAN'
+              when 'vuoriclothing.co.uk' then 'GBR'
+              when 'vuoriclothing.mx' then 'MEX'
+              when 'vuoriclothing.com.au' then 'AUS'
+              when 'vuoriclothing.ae' then 'ARE'
+              when 'vuoriclothing.nl' then 'NLD'
+              when 'ie.vuoriclothing.com' then 'IRL'
+              when 'vuoriclothing.de' then 'DEU'
+              when 'vuoriclothing.fr' then 'FRA'
+              when 'vuoriclothing.hk' then 'HKG'
+              when 'vuoriclothing.sg' then 'SGP'
+              else '_N/A'
+          end::string as iso_3_country_code
+        ,a.raw:event_params as event_params
+        ,a.raw:items as item_params
+        ,a.raw:items.item_params as item_item_params
+        ,case when to_date(a.raw:event_date::string, 'YYYYMMDD') <='2023-06-03' 
+              then regexp_replace(regexp_replace(regexp_replace(parse_url(arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                                                           , transform(raw:event_params, entry -> case when not is_null_value(entry:value.string_value) 
+                                                                                                       then entry:value.string_value 
+                                                                                                       else null 
+                                                                                                   end)):page_location::string):parameters:utm_medium,'',''),'+',' '),'%20',' ')
+              else a.raw:collected_traffic_source.manual_medium::string 
+          end as collected_traffic_source_manual_medium_text 
+        ,case when to_date(a.raw:event_date::string, 'YYYYMMDD') <='2023-06-03' 
+              then regexp_replace(regexp_replace(regexp_replace(parse_url(arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                                                           , transform(raw:event_params, entry -> case when not is_null_value(entry:value.string_value) 
+                                                                                                       then entry:value.string_value 
+                                                                                                       else null 
+                                                                                                   end)):page_location::string):parameters:utm_source,'',''),'+',' '),'%20',' ')
+              else a.raw:collected_traffic_source.manual_source::string 
+          end as collected_traffic_source_manual_source_text
+        ,case when to_date(a.raw:event_date::string, 'YYYYMMDD') <='2023-06-03' 
+              then regexp_replace(parse_url(arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                                                           , transform(raw:event_params, entry -> case when not is_null_value(entry:value.string_value) 
+                                                                                                       then entry:value.string_value 
+                                                                                                       else null 
+                                                                                                   end)):page_location::string):parameters:utm_campaign,'','')
+              else a.raw:collected_traffic_source.manual_campaign_name 
+          end as collected_traffic_source_manual_campaign_text
+        ,case when to_date(a.raw:event_date::string, 'YYYYMMDD') <='2023-06-03' 
+              then regexp_replace(parse_url(arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                                                           , transform(raw:event_params, entry -> case when not is_null_value(entry:value.string_value) 
+                                                                                                       then entry:value.string_value 
+                                                                                                       else null 
+                                                                                                   end)):page_location::string):parameters:utm_id,'','') 
+              else a.raw:collected_traffic_source.manual_campaign_id 
+          end as collected_traffic_source_manual_campaign_code
+        ,case when to_date(a.raw:event_date::string, 'YYYYMMDD') <='2023-06-03' 
+              then regexp_replace(parse_url(arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                                                           , transform(raw:event_params, entry -> case when not is_null_value(entry:value.string_value) 
+                                                                                                       then entry:value.string_value 
+                                                                                                       else null 
+                                                                                                   end)):page_location::string):parameters:utm_content,'','')
+              else a.raw:collected_traffic_source.manual_content::string 
+          end as collected_traffic_source_manual_content_text 
+        ,case when to_date(a.raw:event_date::string, 'YYYYMMDD') <='2023-06-03' 
+              then regexp_replace(parse_url(arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                                                           , transform(raw:event_params, entry -> case when not is_null_value(entry:value.string_value) 
+                                                                                                       then entry:value.string_value 
+                                                                                                       else null 
+                                                                                                   end)):page_location::string):parameters:utm_creative_format,'','') 
+              else a.raw:collected_traffic_source.manual_creative_format::string 
+          end as collected_traffic_source_manual_creative_format_text 
+        ,case when to_date(a.raw:event_date::string, 'YYYYMMDD') <='2023-06-03' 
+              then regexp_replace(parse_url(arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                                                           , transform(raw:event_params, entry -> case when not is_null_value(entry:value.string_value) 
+                                                                                                       then entry:value.string_value 
+                                                                                                       else null 
+                                                                                                   end)):page_location::string):parameters:utm_marketing_tactic,'','') 
+              else a.raw:collected_traffic_source.manual_marketing_tactic::string 
+          end as collected_traffic_source_manual_marketing_tactic_text
+        ,case when to_date(a.raw:event_date::string, 'YYYYMMDD') <='2023-06-03' 
+              then regexp_replace(parse_url(arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                                                           , transform(raw:event_params, entry -> case when not is_null_value(entry:value.string_value) 
+                                                                                                       then entry:value.string_value 
+                                                                                                       else null 
+                                                                                                   end)):page_location::string):parameters:utm_source_platform,'','') 
+              else a.raw:collected_traffic_source.manual_source_platform::string 
+          end as collected_traffic_source_manual_source_platform_text 
+        ,case when to_date(a.raw:event_date::string, 'YYYYMMDD') <='2023-06-03' 
+              then regexp_replace(parse_url(arrays_to_object(transform(a.raw:event_params, entry -> entry:key::string)
+                                                           , transform(a.raw:event_params, entry -> case when not is_null_value(entry:value.string_value) 
+                                                                                                         then entry:value.string_value 
+                                                                                                         else null 
+                                                                                                    end)):page_location::string):parameters:utm_term,'','') 
+              else a.raw:collected_traffic_source.manual_term::string 
+          end as collected_traffic_source_manual_term_text 
+	    ,a.raw:device.mobile_brand_name::string as device_mobile_brand_text 
+        ,a.raw:device.mobile_model_name::string as device_mobile_model_text 
+        ,a.raw:device.mobile_os_hardware_model::string as device_mobile_os_hardware_text 
+        ,a.raw:device.operating_system::string as device_operating_system_text 
+        ,a.raw:device.operating_system_version::string as device_operating_system_version_text 
+        ,coalesce(a.raw:device:web_info.browser::string,a.raw:device.browser::string) as device_browser_text 
+        ,coalesce(a.raw:device:web_info.browser_version::string, a.raw:device.browser_version::string) as device_browser_version_text
+        ,regexp_replace(concat(
+         parse_url(arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                                  , transform(raw:event_params, entry -> case when not is_null_value(entry:value.double_value) 
+                                                                              then entry:value.double_value 
+                                                                              when not is_null_value(entry:value.float_value) 
+                                                                              then entry:value.float_value 
+                                                                              when not is_null_value(entry:value.int_value) 
+                                                                              then entry:value.int_value 
+                                                                              when not is_null_value(entry:value.string_value) 
+                                                                              then entry:value.string_value 
+                                                                              else null 
+                                                                         end)):page_location::string):host 
+        ,parse_url(arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                                  , transform(raw:event_params, entry -> case when not is_null_value(entry:value.double_value) 
+                                                                              then entry:value.double_value 
+                                                                              when not is_null_value(entry:value.float_value) 
+                                                                              then entry:value.float_value 
+                                                                              when not is_null_value(entry:value.int_value) 
+                                                                              then entry:value.int_value 
+                                                                              when not is_null_value(entry:value.string_value) 
+                                                                              then entry:value.string_value 
+                                                                              else null 
+                                                                         end)):page_location::string):path),'"','') as event_landing_page_host_path_text
+        ,c.country_code
+    	,count(*) over (partition by concat(a.raw:user_pseudo_id::string
+                                    ,'-'
+                                    ,arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                                                    , transform(raw:event_params, entry -> case when not is_null_value(entry:value.double_value) 
+                                                                                                then entry:value.double_value 
+                                                                                                when not is_null_value(entry:value.float_value) 
+                                                                                                then entry:value.float_value 
+                                                                                                when not is_null_value(entry:value.int_value) 
+                                                                                                then entry:value.int_value 
+                                                                                                when not is_null_value(entry:value.string_value) 
+                                                                                                then entry:value.string_value 
+                                                                                                else null 
+                                                                                            end)):ga_session_id::string)) as session_event_quantity
+        ,null as session_landing_page_text 
+        ,null as session_country_code 
+        ,null as session_province_or_state_text 
+        ,null as session_metro_area_text 
+        ,null as session_city_text 
+        ,null as session_hostname_extracted_text 
+        ,null as session_device_category_text 
+        ,null as session_device_mobile_brand_text 
+        ,null as session_device_browser_version_text 
+        ,null as session_device_operating_system_text 
+        ,null as session_device_language_text 
+        ,null as session_source_text 
+        ,null as session_medium_text 
+        ,null as session_traffic_source_name_text
+        ,arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                        , transform(raw:event_params, entry -> case when not is_null_value(entry:value.string_value) 
+                                                                    then entry:value.string_value 
+                                                                    else null 
+                                                                end)):search_term::string as event_search_term_text
+        ,arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                        , transform(raw:event_params, entry -> case when not is_null_value(entry:value.string_value) 
+                                                                    then entry:value.string_value 
+                                                                    else null 
+                                                                end)):event_action::string as event_action_text
+        ,arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                        , transform(raw:event_params, entry -> case when not is_null_value(entry:value.string_value) 
+                                                                    then entry:value.string_value 
+                                                                    else null 
+                                                                end)):abtasty_variation::string as abtasty_variation_text
+        ,arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                        , transform(raw:event_params, entry -> case when not is_null_value(entry:value.string_value) 
+                                                                    then entry:value.string_value 
+                                                                    else null 
+                                                                end)):abtasty_campaign::string as abtasty_campaign_text     
+        ,arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                        , transform(raw:event_params, entry -> case when not is_null_value(entry:value.string_value) 
+                                                                    then entry:value.string_value 
+                                                                    else null 
+                                                                end)):event_label::string as event_label_text
+/*
+        ,d.page_location_previous_text
+        ,d.page_title_previous_text
+        ,d.item_list_previous_text 
+*/
+        ,null as page_location_previous_text 
+        ,null as page_title_previous_text 
+        ,null as item_list_previous_text
+        ,coalesce(raw:user_id::string,'_N/A') as customer_code
+        ,arrays_to_object(transform(raw:user_properties, entry -> entry:key::string)
+                         ,transform(raw:user_properties, entry -> case when not is_null_value(entry:value.string_value) 
+                                                                    then entry:value.string_value 
+                                                                    else null 
+                                                                end)):visitor_type::string as visitor_type_text
+        ,arrays_to_object(transform(raw:user_properties, entry -> entry:key::string)
+                         ,transform(raw:user_properties, entry -> case when not is_null_value(entry:value.string_value) 
+                                                                    then entry:value.string_value 
+                                                                    else null 
+                                                                end)):customer_tag::string as customer_tag_text
+        ,arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                        , transform(raw:event_params, entry -> case when not is_null_value(entry:value.string_value) 
+                                                                    then entry:value.string_value 
+                                                                    else null 
+                                                                end)):page_gender::string as page_gender_text
+        ,arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                        , transform(raw:event_params, entry -> case when not is_null_value(entry:value.string_value) 
+                                                                    then entry:value.string_value 
+                                                                    else null 
+                                                                end)):payment_method::string as payment_method_text
+        ,arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                        , transform(raw:event_params, entry -> case when not is_null_value(entry:value.string_value) 
+                                                                    then entry:value.string_value 
+                                                                    else null 
+                                                                end)):carousel_type::string as carousel_type_text
+        ,arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                        , transform(raw:event_params, entry -> case when not is_null_value(entry:value.string_value) 
+                                                                    then entry:value.string_value 
+                                                                    else null 
+                                                                end)):carousel_title::string as carousel_title_text
+        ,arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                        , transform(raw:event_params, entry -> case when not is_null_value(entry:value.string_value) 
+                                                                    then entry:value.string_value 
+                                                                    else null 
+                                                                end)):cart_id::string as cart_text
+        ,coalesce(regexp_replace(parse_url(arrays_to_object(transform(a.raw:event_params, entry -> entry:key::string)
+                                                          , transform(a.raw:event_params, entry -> case when not is_null_value(entry:value.string_value) 
+                                                                                                        then entry:value.string_value 
+                                                                                                        else null 
+                                                                                                    end)):page_location::string,1):parameters:utm_klaviyo_id,'',''),e.klaviyo_person_code, '_N/A')  as klaviyo_person_code 
+        ,arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                        , transform(raw:event_params, entry -> case when not is_null_value(entry:value.double_value) 
+                                                                    then entry:value.double_value 
+                                                                    when not is_null_value(entry:value.float_value) 
+                                                                    then entry:value.float_value 
+                                                                    when not is_null_value(entry:value.int_value) 
+                                                                    then entry:value.int_value 
+                                                                    when not is_null_value(entry:value.string_value) 
+                                                                    then entry:value.string_value 
+                                                                    else null 
+                                                                end)):user_agent::string as user_agent_text
+        ,arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                        , transform(raw:event_params, entry -> case when not is_null_value(entry:value.double_value) 
+                                                                    then entry:value.double_value 
+                                                                    when not is_null_value(entry:value.float_value) 
+                                                                    then entry:value.float_value 
+                                                                    when not is_null_value(entry:value.int_value) 
+                                                                    then entry:value.int_value 
+                                                                    when not is_null_value(entry:value.string_value) 
+                                                                    then entry:value.string_value 
+                                                                    else null 
+                                                                end)):site_feature_impression::string as site_feature_impression_text
+        ,arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                        , transform(raw:event_params, entry -> case when not is_null_value(entry:value.double_value) 
+                                                                    then entry:value.double_value 
+                                                                    when not is_null_value(entry:value.float_value) 
+                                                                    then entry:value.float_value 
+                                                                    when not is_null_value(entry:value.int_value) 
+                                                                    then entry:value.int_value 
+                                                                    when not is_null_value(entry:value.string_value) 
+                                                                    then entry:value.string_value 
+                                                                    else null 
+                                                                end)):plp_filter_type::string as preferred_landing_page_filter_type_text
+        ,a.run_id as connector_run_code
+        ,a.source_table_date as connector_run_date
+        ,coalesce(d.designated_market_area_code,'_N/A') as designated_market_area_code
+        ,arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                        , transform(raw:event_params, entry -> case when not is_null_value(entry:value.string_value) 
+                                                                    then entry:value.string_value 
+                                                                    else null 
+                                                                end)):payment_method_name::string as payment_method_name_text
+        ,arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                        , transform(raw:event_params, entry -> case when not is_null_value(entry:value.double_value) 
+                                                                    then entry:value.double_value 
+                                                                    when not is_null_value(entry:value.float_value) 
+                                                                    then entry:value.float_value 
+                                                                    when not is_null_value(entry:value.int_value) 
+                                                                    then entry:value.int_value 
+                                                                    when not is_null_value(entry:value.string_value) 
+                                                                    then entry:value.string_value 
+                                                                    else null 
+                                                                end)):plp_filters_all::string as preferred_landing_page_filter_text
+        ,arrays_to_object(transform(raw:user_properties, entry -> entry:key::string)
+                         ,transform(raw:user_properties, entry -> case when not is_null_value(entry:value.int_value) 
+                                                                    then entry:value.int_value 
+                                                                    else null 
+                                                                end)):customer_id::string as shopify_customer_code
+        ,arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                        , transform(raw:event_params, entry -> case when not is_null_value(entry:value.double_value) 
+                                                                    then entry:value.double_value 
+                                                                    when not is_null_value(entry:value.float_value) 
+                                                                    then entry:value.float_value 
+                                                                    when not is_null_value(entry:value.int_value) 
+                                                                    then entry:value.int_value 
+                                                                    when not is_null_value(entry:value.string_value) 
+                                                                    then entry:value.string_value 
+                                                                    else null 
+                                                                end)):percent_scrolled::string as percent_scrolled_text
+        ,arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                        , transform(raw:event_params, entry -> case when not is_null_value(entry:value.double_value) 
+                                                                    then entry:value.double_value 
+                                                                    when not is_null_value(entry:value.float_value) 
+                                                                    then entry:value.float_value 
+                                                                    when not is_null_value(entry:value.int_value) 
+                                                                    then entry:value.int_value 
+                                                                    when not is_null_value(entry:value.string_value) 
+                                                                    then entry:value.string_value 
+                                                                    else null 
+                                                                end)):consent_storage::string as consent_storage_text
+        ,arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                        , transform(raw:event_params, entry -> case when not is_null_value(entry:value.double_value) 
+                                                                    then entry:value.double_value 
+                                                                    when not is_null_value(entry:value.float_value) 
+                                                                    then entry:value.float_value 
+                                                                    when not is_null_value(entry:value.int_value) 
+                                                                    then entry:value.int_value 
+                                                                    when not is_null_value(entry:value.string_value) 
+                                                                    then entry:value.string_value 
+                                                                    else null 
+                                                                end)):session_engaged::string as session_engaged_text
+        ,arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                        , transform(raw:event_params, entry -> case when not is_null_value(entry:value.double_value) 
+                                                                    then entry:value.double_value 
+                                                                    when not is_null_value(entry:value.float_value) 
+                                                                    then entry:value.float_value 
+                                                                    when not is_null_value(entry:value.int_value) 
+                                                                    then entry:value.int_value 
+                                                                    when not is_null_value(entry:value.string_value) 
+                                                                    then entry:value.string_value 
+                                                                    else null 
+                                                                end)):session_id_param::string as session_param_text
+    ,arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                        , transform(raw:event_params, entry -> case when not is_null_value(entry:value.double_value) 
+                                                                    then entry:value.double_value 
+                                                                    when not is_null_value(entry:value.float_value) 
+                                                                    then entry:value.float_value 
+                                                                    when not is_null_value(entry:value.int_value) 
+                                                                    then entry:value.int_value 
+                                                                    when not is_null_value(entry:value.string_value) 
+                                                                    then entry:value.string_value 
+                                                                    else null 
+                                                                end)):session_id_elevar::string as session_elevar_text
+    ,arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                    , transform(raw:event_params, entry -> case when not is_null_value(entry:value.double_value) 
+                                                                    then entry:value.double_value 
+                                                                    when not is_null_value(entry:value.float_value) 
+                                                                    then entry:value.float_value 
+                                                                    when not is_null_value(entry:value.int_value) 
+                                                                    then entry:value.int_value 
+                                                                    when not is_null_value(entry:value.string_value) 
+                                                                    then entry:value.string_value 
+                                                                    else null 
+                                                                end)):ignore_referrer::string as ignore_referrer_text
+    ,arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                        , transform(raw:event_params, entry -> case when not is_null_value(entry:value.double_value) 
+                                                                    then entry:value.double_value 
+                                                                    when not is_null_value(entry:value.float_value) 
+                                                                    then entry:value.float_value 
+                                                                    when not is_null_value(entry:value.int_value) 
+                                                                    then entry:value.int_value 
+                                                                    when not is_null_value(entry:value.string_value) 
+                                                                    then entry:value.string_value 
+                                                                    else null 
+                                                                end)):content_group::string as content_group_text
+    ,arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                        , transform(raw:event_params, entry -> case when not is_null_value(entry:value.double_value) 
+                                                                    then entry:value.double_value 
+                                                                    when not is_null_value(entry:value.float_value) 
+                                                                    then entry:value.float_value 
+                                                                    when not is_null_value(entry:value.int_value) 
+                                                                    then entry:value.int_value 
+                                                                    when not is_null_value(entry:value.string_value) 
+                                                                    then entry:value.string_value 
+                                                                    else null 
+                                                                end)):engagement_type::string as engagement_type_text
+        ,a.raw:platform::string as platform_text
+        ,arrays_to_object(transform(raw:user_properties, entry -> entry:key::string)
+                         ,transform(raw:user_properties, entry -> case when not is_null_value(entry:value.string_value) 
+                                                                    then entry:value.string_value 
+                                                                    else null 
+                                                                end)):ga_user_id::string as google_analytics_user_text
+        ,arrays_to_object(transform(raw:user_properties, entry -> entry:key::string)
+                         ,transform(raw:user_properties, entry -> case when not is_null_value(entry:value.string_value) 
+                                                                    then entry:value.string_value 
+                                                                    else null 
+                                                                end)):ga_user_id::string as customer_type_text
+        ,a.raw:privacy_info.ads_storage::string as ad_storage_text
+        ,a.raw:privacy_info.analytics_storage::string as analytics_storage_text
+        ,a.raw:privacy_info.uses_transient_token::string as transient_token_text
+        ,arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                        , transform(raw:event_params, entry -> case when not is_null_value(entry:value.double_value) 
+                                                                    then entry:value.double_value 
+                                                                    when not is_null_value(entry:value.float_value) 
+                                                                    then entry:value.float_value 
+                                                                    when not is_null_value(entry:value.int_value) 
+                                                                    then entry:value.int_value 
+                                                                    when not is_null_value(entry:value.string_value) 
+                                                                    then entry:value.string_value 
+                                                                    else null 
+                                                                end)):klaid::string as klaviyo_exchange_text
+        ,arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                        , transform(raw:event_params, entry -> case when not is_null_value(entry:value.double_value) 
+                                                                    then entry:value.double_value 
+                                                                    when not is_null_value(entry:value.float_value) 
+                                                                    then entry:value.float_value 
+                                                                    when not is_null_value(entry:value.int_value) 
+                                                                    then entry:value.int_value 
+                                                                    when not is_null_value(entry:value.string_value) 
+                                                                    then entry:value.string_value 
+                                                                    else null 
+                                                                end)):email_signup_checkout::string as email_signup_checkout_text
+        ,arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                        , transform(raw:event_params, entry -> case when not is_null_value(entry:value.double_value) 
+                                                                    then entry:value.double_value 
+                                                                    when not is_null_value(entry:value.float_value) 
+                                                                    then entry:value.float_value 
+                                                                    when not is_null_value(entry:value.int_value) 
+                                                                    then entry:value.int_value 
+                                                                    when not is_null_value(entry:value.string_value) 
+                                                                    then entry:value.string_value 
+                                                                    else null 
+                                                                end)):product_tags::string as product_tags_text
+        ,arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                        , transform(raw:event_params, entry -> case when not is_null_value(entry:value.double_value) 
+                                                                    then entry:value.double_value 
+                                                                    when not is_null_value(entry:value.float_value) 
+                                                                    then entry:value.float_value 
+                                                                    when not is_null_value(entry:value.int_value) 
+                                                                    then entry:value.int_value 
+                                                                    when not is_null_value(entry:value.string_value) 
+                                                                    then entry:value.string_value 
+                                                                    else null 
+                                                                end)):checkout_type::string as checkout_type_text
+        ,coalesce(e.consumer_key,'_N/A') as consumer_key
+        ,'_N/A' as product_badge_text
+	    ,'_N/A' as product_badge_list_text
+	    ,'_N/A' as product_badge_count_text
+	    ,'_N/A' as product_badge_parent_page_text
+        ,current_timestamp as audit_create_date 
+        ,current_timestamp as audit_change_date 
+        ,'administrator' as audit_create_user 
+        ,'administrator' as audit_change_user
+    from src_ga4.analytics_intraday_251469190 a
+           left join curated.web_session_bot_flag b 
+                  on concat(a.raw:user_pseudo_id::string
+                     ,'-'
+                     ,arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                                     , transform(raw:event_params, entry -> case when not is_null_value(entry:value.double_value) 
+                                                                                 then entry:value.double_value 
+                                                                                 when not is_null_value(entry:value.float_value) 
+                                                                                 then entry:value.float_value 
+                                                                                 when not is_null_value(entry:value.int_value) 
+                                                                                 then entry:value.int_value 
+                                                                                 when not is_null_value(entry:value.string_value) 
+                                                                                 then entry:value.string_value 
+                                                                                 else null 
+                                                                             end)):ga_session_id::string) = b.session_code
+           left join curated.vw_country c
+                  on lower(raw:geo.country::string)      = lower(c.google_session_country_text)
+           left join src_manual.vw_stage_designated_market_area_google_xref d
+                  on lower(a.raw:geo.metro::string)     = lower(d.session_metro_area_text)
+           left join (select a.klaviyo_exchange_text
+                            ,a.klaviyo_person_code
+                            ,c.consumer_key
+                        from curated.web_event_klaviyo_exchange a
+                             inner join src_klavioyo.vw_person b 
+                                     on a.klaviyo_person_code     = b.id
+                              left join (select c.primary_email_text
+                                              , min(c.consumer_key) as consumer_key
+                                          from curated.vw_consumer c 
+                                         group 
+                                            by c.primary_email_text) as c
+                                    on lower(b.email)            = c.primary_email_text) as e
+                  on arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                                    , transform(raw:event_params, entry -> case when not is_null_value(entry:value.double_value) 
+                                                                                then entry:value.double_value 
+                                                                                when not is_null_value(entry:value.float_value) 
+                                                                                then entry:value.float_value 
+                                                                                when not is_null_value(entry:value.int_value) 
+                                                                                then entry:value.int_value 
+                                                                                when not is_null_value(entry:value.string_value) 
+                                                                                then entry:value.string_value 
+                                                                                else null 
+                                                                            end)):klaid::string  = e.klaviyo_exchange_text
+   where a.ingestion_complete = TRUE
+     and to_date(a.raw:event_date::string, 'YYYYMMDD') >= dateadd('day',-2, current_date) --between '2025-0
+     and arrays_to_object(transform(raw:event_params, entry -> entry:key::string)
+                        , transform(raw:event_params, entry -> case when not is_null_value(entry:value.double_value) 
+                                                                    then entry:value.double_value 
+                                                                    when not is_null_value(entry:value.float_value) 
+                                                                    then entry:value.float_value 
+                                                                    when not is_null_value(entry:value.int_value) 
+                                                                    then entry:value.int_value 
+                                                                    when not is_null_value(entry:value.string_value) 
+                                                                    then entry:value.string_value 
+                                                                    else null 
+                                                                end)):ga_session_id::string is not null;
